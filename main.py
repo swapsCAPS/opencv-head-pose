@@ -1,62 +1,35 @@
-#!/usr/bin/env python
-
-import cv2
 import numpy as np
+import cv2 as cv
+import dlib
 
-# Read Image
-im = cv2.imread("headPose.jpg");
-size = im.shape
+cap      = cv.VideoCapture(0)
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(predictor_path)
 
-#2D image points. If you change the image, you need to change vector
-image_points = np.array([
-    (359, 391),     # Nose tip
-    (399, 561),     # Chin
-    (337, 297),     # Left eye left corner
-    (513, 301),     # Right eye right corne
-    (345, 465),     # Left Mouth corner
-    (453, 469)      # Right mouth corner
-], dtype="double")
+if not cap.isOpened():
+    print("Cannot open camera")
+    exit()
 
-# 3D model points.
-model_points = np.array([
-    (0.0, 0.0, 0.0),             # Nose tip
-    (0.0, -330.0, -65.0),        # Chin
-    (-225.0, 170.0, -135.0),     # Left eye left corner
-    (225.0, 170.0, -135.0),      # Right eye right corne
-    (-150.0, -150.0, -125.0),    # Left Mouth corner
-    (150.0, -150.0, -125.0)      # Right mouth corner
-])
+while True:
+    # Capture frame-by-frame
+    ret, frame = cap.read()
 
+    # if frame is read correctly ret is True
+    if not ret:
+        print("Can't receive frame (stream end?). Exiting ...")
+        break
 
-# Camera internals
+    detected_faces = detector(frame, 1)
+    print("detected {} faces".format(len(detected_faces)))
 
-focal_length = size[1]
-center = (size[1]/2, size[0]/2)
-camera_matrix = np.array(
-    [[focal_length, 0, center[0]],
-    [0, focal_length, center[1]],
-    [0, 0, 1]], dtype = "double"
-)
+    for face, pos in enumerate(faces):
+        shape = predictor(face, pos)
 
-print "Camera Matrix :\n {0}".format(camera_matrix)
+    # Display the resulting frame
+    cv.imshow('frame', frame)
+    if cv.waitKey(1) == ord('q'):
+        break
 
-dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
-(success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-
-print "Rotation Vector:\n {0}".format(rotation_vector)
-print "Translation Vector:\n {0}".format(translation_vector)
-
-# Project a 3D point (0, 0, 1000.0) onto the image plane.
-(nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1000.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
-
-for p in image_points:
-    cv2.circle(im, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
-
-p1 = ( int(image_points[0][0]), int(image_points[0][1]))
-p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
-
-cv2.line(im, p1, p2, (255,0,0), 2)
-
-# Display image
-cv2.imshow("Output", im)
-cv2.waitKey(0)
+# When everything done, release the capture
+cap.release()
+cv.destroyAllWindows()
