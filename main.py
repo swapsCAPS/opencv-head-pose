@@ -20,8 +20,6 @@ while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
 
-    time.sleep(0.1)
-
     # if frame is read correctly ret is True
     if not ret:
         print("Can't receive frame (stream end?). Exiting ...")
@@ -29,26 +27,13 @@ while True:
 
     frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
 
+    detected_faces = detector(frame, 1)
+
+    objects = list(map(lambda pos: predictor(frame, pos), detected_faces))
+
     win.clear_overlay()
     win.set_image(frame)
-
-    detected_faces = detector(frame, 1)
-    print("detected {} faces".format(len(detected_faces)))
-
-    for face, pos in enumerate(detected_faces):
-        shape = predictor(frame, pos)
-
-        print("Part 0: {}, Part 1: {} ...".format(shape.part(0), shape.part(1)))
-
-        win.add_overlay(detection=shape, color=draw_color)
-
-    win.add_overlay(detected_faces)
-
-
-    #  # Display the resulting frame
-    #  cv.imshow('frame', frame)
-    #  if cv.waitKey(1) == ord('q'):
-        #  break
+    win.add_overlay(objects=objects)
 
 # When everything done, release the capture
 cap.release()
