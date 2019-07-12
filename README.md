@@ -1,5 +1,8 @@
 # Playing around with dlib and opencv
 
+### Deps (including but not limited to)
+- `pip install --user dlib opencv-python`
+
 ### resources and credits
 - http://dlib.net
 - https://opencv.org/

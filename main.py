@@ -4,6 +4,7 @@ import cv2 as cv
 import dlib
 import time
 import threading
+import itertools
 
 cap            = cv.VideoCapture(0)
 detector       = dlib.get_frontal_face_detector()
@@ -11,7 +12,7 @@ predictor_path = "{}/Downloads/shape_predictor_68_face_landmarks.dat".format(os.
 predictor      = dlib.shape_predictor(predictor_path)
 
 facial_landmark_indices = {
-    "eye_left":    46,
+    "eye_left":    45,
     "eye_right":   36,
     "mouth_left":  54,
     "mouth_right": 48,
@@ -39,6 +40,28 @@ new_width             = 0
 new_height            = 0
 has_calculated_ratios = False
 
+colors = [ (255, 0, 0), (0, 255, 0), (0, 0, 255) ]
+
+def make_get_landmarks(resized_frame, upsample_ratio, colors, facial_landmark_indices):
+    def get_landmarks((face_idx, face)):
+        shape = predictor(resized_frame, face)
+
+        # Reuse colors if too many faces
+        if face_idx > len(colors) - 1:
+            face_idx = face_idx - len(colors)
+
+        return map(lambda landmark_idx:
+            {
+                "pos": (
+                    int(round(shape.part(landmark_idx).x * upsample_ratio)),
+                    int(round(shape.part(landmark_idx).y * upsample_ratio)),
+                ),
+                "color": colors[face_idx]
+            }
+
+        , facial_landmark_indices.values())
+    return get_landmarks
+
 while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
@@ -48,7 +71,6 @@ while True:
         print("Can't receive frame (stream end?). Exiting ...")
         break
 
-    # TODO only run this for the first frame, assuming frame size never changes
     if not has_calculated_ratios:
         width                 = frame.shape[1]
         height                = frame.shape[0]
@@ -60,27 +82,29 @@ while True:
 
     frame_count += 1
 
-    # Only do detection every other frame
+    # Only do detection every n frame
     if frame_count >= 2:
+        frame_count = 0
 
-        resized_frame = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
+        resized_frame  = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
 
         detected_faces = detector(resized_frame, 1)
 
-        for face in detected_faces:
-            shape     = predictor(resized_frame, face)
-            landmarks = map(lambda idx: shape.part(idx) , facial_landmark_indices.values())
+        get_landmarks  = make_get_landmarks(
+            resized_frame           = resized_frame,
+            upsample_ratio          = upsample_ratio,
+            colors                  = colors,
+            facial_landmark_indices = facial_landmark_indices,
+        )
 
-        frame_count = 0
+        landmarks = map(get_landmarks, enumerate(detected_faces))
+        landmarks = list(itertools.chain(*landmarks))
 
     for landmark in landmarks:
-        pos = (
-            int(round(landmark.x * upsample_ratio)),
-            int(round(landmark.y * upsample_ratio)),
-        )
-        cv.circle(frame, pos, 3, (0, 255, 0), -1)
+        cv.circle(frame, landmark['pos'], 3, landmark['color'], -1)
 
     # Display the resulting frame
+    cv.flip(frame, 1)
     cv.imshow('frame', frame)
     if cv.waitKey(1) == ord('q'):
         break
