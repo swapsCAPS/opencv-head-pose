@@ -31,6 +31,14 @@ landmarks = []
 
 REQUESTED_WIDTH = 300
 
+width                 = 0
+height                = 0
+ratio                 = 0
+upsample_ratio        = 0
+new_width             = 0
+new_height            = 0
+has_calculated_ratios = False
+
 while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
@@ -41,12 +49,14 @@ while True:
         break
 
     # TODO only run this for the first frame, assuming frame size never changes
-    width          = frame.shape[1]
-    height         = frame.shape[0]
-    ratio          = REQUESTED_WIDTH / float(width)
-    upsample_ratio = float(width)    / REQUESTED_WIDTH
-    new_width      = int(round(width  * ratio))
-    new_height     = int(round(height * ratio))
+    if not has_calculated_ratios:
+        width                 = frame.shape[1]
+        height                = frame.shape[0]
+        ratio                 = REQUESTED_WIDTH / float(width)
+        upsample_ratio        = float(width)    / REQUESTED_WIDTH
+        new_width             = int(round(width  * ratio))
+        new_height            = int(round(height * ratio))
+        has_calculated_ratios = True
 
     frame_count += 1
 
