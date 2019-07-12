@@ -5,22 +5,31 @@ import dlib
 import time
 import threading
 import itertools
+import collections
 
 cap            = cv.VideoCapture(0)
 detector       = dlib.get_frontal_face_detector()
 predictor_path = "{}/Downloads/shape_predictor_68_face_landmarks.dat".format(os.environ['HOME'])
 predictor      = dlib.shape_predictor(predictor_path)
 
-FACIAL_LANDMARK_INDICES = {
-    "eye_left":    45,
-    "eye_right":   36,
-    "mouth_left":  54,
-    "mouth_right": 48,
-    "nose_tip":    30,
-    "chin":        8,
-}
+FACIAL_LANDMARK_INDICES = collections.OrderedDict([
+    ("nose_tip",    30),
+    ("chin",        8),
+    ("eye_right",   45),
+    ("eye_left",    36),
+    ("mouth_right", 54),
+    ("mouth_left",  48),
+])
 
-draw_color = dlib.rgb_pixel(0,255,0)
+HEAD_MODEL_POINTS = np.array([
+    (0.0,    0.0,    0.0),    # Nose tip
+    (0.0,    -330.0, -65.0),  # Chin
+    (-225.0, 170.0,  -135.0), # Left eye left corner
+    (225.0,  170.0,  -135.0), # Right eye right corne
+    (-150.0, -150.0, -125.0), # Left Mouth corner
+    (150.0,  -150.0, -125.0)  # Right mouth corner
+])
+
 
 if not cap.isOpened():
     print("Cannot open camera")
@@ -28,6 +37,8 @@ if not cap.isOpened():
 
 frame_count = 0
 
+p1 = ()
+p2 = ()
 landmarks = []
 
 REQUESTED_WIDTH = 300
@@ -50,8 +61,9 @@ def make_get_landmarks(resized_frame, upsample_ratio, colors, facial_landmark_in
         if face_idx > len(colors) - 1:
             face_idx = face_idx - len(colors)
 
-        return map(lambda landmark_idx:
+        return map(lambda (name, landmark_idx):
             {
+                "name": name,
                 "pos": (
                     int(round(shape.part(landmark_idx).x * upsample_ratio)),
                     int(round(shape.part(landmark_idx).y * upsample_ratio)),
@@ -59,7 +71,7 @@ def make_get_landmarks(resized_frame, upsample_ratio, colors, facial_landmark_in
                 "color": colors[face_idx]
             }
 
-        , facial_landmark_indices.values())
+        , facial_landmark_indices.items())
     return get_landmarks
 
 while True:
@@ -82,6 +94,16 @@ while True:
 
     frame_count += 1
 
+    size = frame.shape
+    focal_length  = size[1]
+    center        = (size[1] / 2, size[0] / 2)
+    camera_matrix = np.array([
+        [focal_length, 0,            center[0]],
+        [0,            focal_length, center[1]],
+        [0,            0,            1]
+     ], dtype = "double")
+
+    dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
     # Only do detection every n frame
     if frame_count >= 2:
         frame_count = 0
@@ -97,11 +119,40 @@ while True:
             colors                  = COLORS,
         )
 
+
         landmarks = map(get_landmarks, enumerate(detected_faces))
+
+        for landmark in landmarks:
+            for d in landmark:
+                print(d)
+            print()
+            image_points = np.array(map(lambda l: l['pos'], landmark), dtype="double")
+            (success, rotation_vector, translation_vector) = cv.solvePnP(
+                HEAD_MODEL_POINTS,
+                image_points,
+                camera_matrix,
+                dist_coeffs,
+                flags=cv.SOLVEPNP_ITERATIVE,
+            )
+
+            (nose_end_point2D, jacobian) = cv.projectPoints(
+                np.array([(0.0, 0.0, 1000.0)]),
+                rotation_vector,
+                translation_vector,
+                camera_matrix,
+                dist_coeffs
+            )
+
+            p1 = ( int(image_points[0][0]), int(image_points[0][1]))
+            p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
+
         landmarks = list(itertools.chain(*landmarks))
 
     for landmark in landmarks:
         cv.circle(frame, landmark['pos'], 3, landmark['color'], -1)
+
+    if len(landmarks) > 0:
+        cv.line(frame, p1, p2, (0,255,0), 3)
 
     # Display the resulting frame
     cv.flip(frame, 1)
