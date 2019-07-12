@@ -25,6 +25,12 @@ if not cap.isOpened():
     print("Cannot open camera")
     exit()
 
+count = 0
+
+landmarks = []
+
+REQUESTED_WIDTH = 320
+
 while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
@@ -34,16 +40,27 @@ while True:
         print("Can't receive frame (stream end?). Exiting ...")
         break
 
-    detected_faces = detector(frame, 1)
+    ratio = REQUESTED_WIDTH / float(frame.shape[1])
 
-    for face in detected_faces:
-        shape     = predictor(frame, face)
-        landmarks = map(lambda idx: shape.part(idx) , facial_landmark_indices.values())
+    new_width  = int(frame.shape[1] * ratio)
+    new_height = int(frame.shape[0] * ratio)
 
-        for landmark in landmarks:
-            print('landmark', landmark)
+    resized_frame = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
 
-            cv.circle(frame, (landmark.x, landmark.y), 3, (0,255,0), -1)
+    count += 1
+
+    if count >= 5:
+        #  resized_frame = cv.resize(frame, )
+        detected_faces = detector(resized_frame, 1)
+
+        for face in detected_faces:
+            shape     = predictor(frame, face)
+            landmarks = map(lambda idx: shape.part(idx) , facial_landmark_indices.values())
+
+        count = 0
+
+    for landmark in landmarks:
+        cv.circle(frame, (landmark.x, landmark.y), 3, (0, 255, 0), -1)
 
     # Display the resulting frame
     cv.imshow('frame', frame)
