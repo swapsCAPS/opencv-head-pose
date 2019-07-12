@@ -15,10 +15,10 @@ predictor      = dlib.shape_predictor(predictor_path)
 FACIAL_LANDMARK_INDICES = collections.OrderedDict([
     ("nose_tip",    30),
     ("chin",        8),
-    ("eye_right",   45),
     ("eye_left",    36),
-    ("mouth_right", 54),
+    ("eye_right",   45),
     ("mouth_left",  48),
+    ("mouth_right", 54),
 ])
 
 HEAD_MODEL_POINTS = np.array([
@@ -41,7 +41,7 @@ p1 = ()
 p2 = ()
 landmarks = []
 
-REQUESTED_WIDTH = 300
+REQUESTED_WIDTH = 600
 
 width                 = 0
 height                = 0
@@ -105,7 +105,7 @@ while True:
 
     dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
     # Only do detection every n frame
-    if frame_count >= 2:
+    if frame_count >= 1:
         frame_count = 0
 
         resized_frame  = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
@@ -123,9 +123,6 @@ while True:
         landmarks = map(get_landmarks, enumerate(detected_faces))
 
         for landmark in landmarks:
-            for d in landmark:
-                print(d)
-            print()
             image_points = np.array(map(lambda l: l['pos'], landmark), dtype="double")
             (success, rotation_vector, translation_vector) = cv.solvePnP(
                 HEAD_MODEL_POINTS,
@@ -143,8 +140,8 @@ while True:
                 dist_coeffs
             )
 
-            p1 = ( int(image_points[0][0]), int(image_points[0][1]))
-            p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
+            p1 = ( int(round(image_points[0][0])), int(round(image_points[0][1])))
+            p2 = ( int(round(nose_end_point2D[0][0][0])), int(round(nose_end_point2D[0][0][1])))
 
         landmarks = list(itertools.chain(*landmarks))
 
@@ -155,7 +152,7 @@ while True:
         cv.line(frame, p1, p2, (0,255,0), 3)
 
     # Display the resulting frame
-    cv.flip(frame, 1)
+    frame = cv.flip(frame, 1)
     cv.imshow('frame', frame)
     if cv.waitKey(1) == ord('q'):
         break
