@@ -25,11 +25,11 @@ if not cap.isOpened():
     print("Cannot open camera")
     exit()
 
-count = 0
+frame_count = 0
 
 landmarks = []
 
-REQUESTED_WIDTH = 320
+REQUESTED_WIDTH = 300
 
 while True:
     # Capture frame-by-frame
@@ -40,27 +40,35 @@ while True:
         print("Can't receive frame (stream end?). Exiting ...")
         break
 
-    ratio = REQUESTED_WIDTH / float(frame.shape[1])
+    # TODO only run this for the first frame, assuming frame size never changes
+    width          = frame.shape[1]
+    height         = frame.shape[0]
+    ratio          = REQUESTED_WIDTH / float(width)
+    upsample_ratio = float(width)    / REQUESTED_WIDTH
+    new_width      = int(round(width  * ratio))
+    new_height     = int(round(height * ratio))
 
-    new_width  = int(frame.shape[1] * ratio)
-    new_height = int(frame.shape[0] * ratio)
+    frame_count += 1
 
-    resized_frame = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
+    # Only do detection every other frame
+    if frame_count >= 2:
 
-    count += 1
+        resized_frame = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
 
-    if count >= 5:
-        #  resized_frame = cv.resize(frame, )
         detected_faces = detector(resized_frame, 1)
 
         for face in detected_faces:
-            shape     = predictor(frame, face)
+            shape     = predictor(resized_frame, face)
             landmarks = map(lambda idx: shape.part(idx) , facial_landmark_indices.values())
 
-        count = 0
+        frame_count = 0
 
     for landmark in landmarks:
-        cv.circle(frame, (landmark.x, landmark.y), 3, (0, 255, 0), -1)
+        pos = (
+            int(round(landmark.x * upsample_ratio)),
+            int(round(landmark.y * upsample_ratio)),
+        )
+        cv.circle(frame, pos, 3, (0, 255, 0), -1)
 
     # Display the resulting frame
     cv.imshow('frame', frame)
