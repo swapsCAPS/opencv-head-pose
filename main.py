@@ -11,7 +11,7 @@ detector       = dlib.get_frontal_face_detector()
 predictor_path = "{}/Downloads/shape_predictor_68_face_landmarks.dat".format(os.environ['HOME'])
 predictor      = dlib.shape_predictor(predictor_path)
 
-facial_landmark_indices = {
+FACIAL_LANDMARK_INDICES = {
     "eye_left":    45,
     "eye_right":   36,
     "mouth_left":  54,
@@ -40,7 +40,7 @@ new_width             = 0
 new_height            = 0
 has_calculated_ratios = False
 
-colors = [ (255, 0, 0), (0, 255, 0), (0, 0, 255) ]
+COLORS = [ (255, 0, 0), (0, 255, 0), (0, 0, 255) ]
 
 def make_get_landmarks(resized_frame, upsample_ratio, colors, facial_landmark_indices):
     def get_landmarks((face_idx, face)):
@@ -91,10 +91,10 @@ while True:
         detected_faces = detector(resized_frame, 1)
 
         get_landmarks  = make_get_landmarks(
-            resized_frame           = resized_frame,
-            upsample_ratio          = upsample_ratio,
-            colors                  = colors,
-            facial_landmark_indices = facial_landmark_indices,
+            resized_frame,
+            upsample_ratio,
+            facial_landmark_indices = FACIAL_LANDMARK_INDICES,
+            colors                  = COLORS,
         )
 
         landmarks = map(get_landmarks, enumerate(detected_faces))
