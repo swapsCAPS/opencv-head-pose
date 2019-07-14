@@ -1,5 +1,8 @@
 # Playing around with dlib and opencv
 
+### About
+Experimenting with real time head pose estimation.
+
 ### Deps (including but not limited to)
 - `pip install --user dlib opencv-python`
 
