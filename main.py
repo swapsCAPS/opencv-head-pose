@@ -12,7 +12,7 @@ detector       = dlib.get_frontal_face_detector()
 predictor_path = '{}/Downloads/shape_predictor_68_face_landmarks.dat'.format(os.environ['HOME'])
 predictor      = dlib.shape_predictor(predictor_path)
 
-DLIB_FRAME_WIDTH    = 400
+DLIB_FRAME_WIDTH    = 450
 RUN_EVERY_NTH_FRAME = 3
 
 # From camera perspective (subject's left is our right...)

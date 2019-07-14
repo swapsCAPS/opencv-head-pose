@@ -2,6 +2,7 @@
 
 ### About
 Experimenting with real time head pose estimation.
+<img src="https://github.com/swapsCAPS/opencv-head-pose/blob/master/gif.gif" width="640" />
 
 ### Deps (including but not limited to)
 - `pip install --user dlib opencv-python`
