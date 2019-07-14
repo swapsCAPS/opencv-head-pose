@@ -39,19 +39,22 @@ frame_count = 0
 
 landmarks = []
 
-COLORS          = [ (255, 0, 0), (0, 255, 0), (0, 0, 255) ]
-REQUESTED_WIDTH = 500
-
-width                 = 0
-height                = 0
-ratio                 = 0
-upsample_ratio        = 0
-new_width             = 0
-new_height            = 0
-has_calculated_ratios = False
+COLORS = [
+    (180,119,31),
+    (14,127,255),
+    (44,160,44),
+    (40,39,214),
+    (189,103,148),
+    (75,86,140),
+    (194,119,227),
+    (127,127,127),
+    (34,189,188),
+    (207,190,23),
+]
+REQUESTED_WIDTH = 300
 
 def get_color(idx):
-    COLORS[face_idx % len(COLORS)]
+    return COLORS[idx % len(COLORS)]
 
 def create_point(pos, color):
     return { "pos": pos, "color": color }
@@ -68,6 +71,7 @@ def create_draw_buffer():
 def draw(frame, draw_buffer):
     for point in draw_buffer['points']:
         cv.circle(frame, point['pos'], 3, point['color'], -1)
+
     for line in draw_buffer['lines']:
         cv.line(frame, line['p1'], line['p2'], line['color'], 3)
 
@@ -76,6 +80,16 @@ def draw(frame, draw_buffer):
     cv.imshow('frame', frame)
 
 draw_buffer = create_draw_buffer()
+
+frame_info = {
+    "width":                     0,
+    "height":                    0,
+    "ratio":                     0,
+    "upsample_ratio":            0,
+    "new_width":                 0,
+    "new_height":                0,
+    "has_calculated_frame_info": False,
+}
 
 while True:
     # Capture frame-by-frame
@@ -86,81 +100,78 @@ while True:
         print("Can't receive frame (stream end?). Exiting ...")
         break
 
-    if not has_calculated_ratios:
-        width                 = frame.shape[1]
-        height                = frame.shape[0]
-        ratio                 = REQUESTED_WIDTH / float(width)
-        upsample_ratio        = float(width)    / REQUESTED_WIDTH
-        new_width             = int(round(width  * ratio))
-        new_height            = int(round(height * ratio))
-        has_calculated_ratios = True
+    if not frame_info['has_calculated_frame_info']:
+        frame_info["width"]                 = frame.shape[1]
+        frame_info["height"]                = frame.shape[0]
+        frame_info["ratio"]                 = REQUESTED_WIDTH / float(frame['width'])
+        frame_info["upsample_ratio"]        = float(frame['width'])    / REQUESTED_WIDTH
+        frame_info["new_width"]             = int(round(frame['width']  * ratio))
+        frame_info["new_height"]            = int(round(frame['height'] * ratio))
+        frame_info["has_calculated_ratios"] = True
+        frame_info["focal_length"]          = frame['width']
+        frame_info["center"]                = (frame['width'] / 2, frame_info['height'] / 2)
+        frame_info["camera_matrix"]         = np.array([
+            [frame_info['focal_length'], 0,                          frame_info['center'][0]],
+            [0,                          frame_info['focal_length'], frame_info['center'][1]],
+            [0,                          0,                          1]
+         ], dtype = "double")
+        frame_info["dist_coeffs"] = np.zeros((4,1)) # Assuming no lens distortion
 
     frame_count += 1
 
-    focal_length  = width
-    center        = (width / 2, height / 2)
-    camera_matrix = np.array([
-        [focal_length, 0,            center[0]],
-        [0,            focal_length, center[1]],
-        [0,            0,            1]
-     ], dtype = "double")
-    dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
 
     # Only do detection every n frame
-    if frame_count >= 1:
+    if frame_count >= 3:
         frame_count = 0
 
         resized_frame  = cv.resize(frame, (new_width, new_height), interpolation = cv.INTER_AREA)
 
         detected_faces = detector(resized_frame, 1)
 
-        draw_buffer = create_draw_buffer()
+        if len(detected_faces) > 0:
 
-        # For each detected face
-        for face_idx, face in enumerate(detected_faces):
-            shape = predictor(resized_frame, face)
+            draw_buffer = create_draw_buffer()
 
-            # get each landmark we are interested in (we don't need all 68) add a circle to the frame
-            def get_landmarks(landmark_idx):
-                part = shape.part(landmark_idx)
-                return (
-                    int(round(part.x * upsample_ratio)),
-                    int(round(part.y * upsample_ratio)),
+            # For each detected face
+            for face_idx, face in enumerate(detected_faces):
+                shape = predictor(resized_frame, face)
+
+                # get each landmark we are interested in (we don't need all 68) add a circle to the frame
+                def get_landmarks(landmark_idx):
+                    part = shape.part(landmark_idx)
+                    return (
+                        int(round(part.x * upsample_ratio)),
+                        int(round(part.y * upsample_ratio)),
+                    )
+
+                landmark_positions = map(get_landmarks, FACIAL_LANDMARK_INDICES.values())
+
+                # Do magic
+                (success, rotation_vector, translation_vector) = cv.solvePnP(
+                    HEAD_MODEL_POINTS,
+                    np.array(landmark_positions, dtype="double"),
+                    camera_matrix,
+                    dist_coeffs,
+                    flags=cv.SOLVEPNP_ITERATIVE,
                 )
 
-            landmark_positions = map(get_landmarks, FACIAL_LANDMARK_INDICES.values())
-            print('landmark_positions', landmark_positions)
+                (nose_end_point2D, jacobian) = cv.projectPoints(
+                    np.array([(0.0, 0.0, 1000.0)]),
+                    rotation_vector,
+                    translation_vector,
+                    camera_matrix,
+                    dist_coeffs
+                )
 
-            # Do magic
-            (success, rotation_vector, translation_vector) = cv.solvePnP(
-                HEAD_MODEL_POINTS,
-                np.array(landmark_positions, dtype="double"),
-                camera_matrix,
-                dist_coeffs,
-                flags=cv.SOLVEPNP_ITERATIVE,
-            )
+                for pos in landmark_positions:
+                    point = create_point(pos, get_color(face_idx))
+                    draw_buffer['points'].append(point)
 
-            (nose_end_point2D) = cv.projectPoints(
-                np.array([(0.0, 0.0, 1000.0)]),
-                rotation_vector,
-                translation_vector,
-                camera_matrix,
-                dist_coeffs
-            )
+                p1 = (x, y) = landmark_positions[0]
+                p2 = (int(round(nose_end_point2D[0][0][0])), int(round(nose_end_point2D[0][0][1])))
+                line = create_line(p1, p2, get_color(face_idx + 2))
 
-            color = get_color(face_idx)
-
-            for pos in landmark_positions:
-                point = create_point(pos, color)
-                draw_buffer['points'].append(point)
-
-            nose_tip_position = landmark_positions[0]
-
-            p1 = (x, y) = nose_tip_position
-            p2 = (int(round(nose_end_point2D[0][0][0])), int(round(nose_end_point2D[0][0][1])))
-            line = create_line(p1, p2, color)
-
-            draw_buffer['lines'].append(line)
+                draw_buffer['lines'].append(line)
 
     draw(frame, draw_buffer)
     if cv.waitKey(1) == ord('q'):
