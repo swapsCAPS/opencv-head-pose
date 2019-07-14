@@ -149,7 +149,7 @@ while True:
 
             landmark_positions = map(get_landmarks, FACIAL_LANDMARK_INDICES.values())
 
-            # Do magic
+            # Do camera perspective magic by matching our facial landmarks to a predefined 3D model's landsmarks
             (success, rotation_vector, translation_vector) = cv.solvePnP(
                 np.array(HEAD_MODEL_POINTS.values()),
                 np.array(landmark_positions, dtype='double'),
@@ -158,6 +158,7 @@ while True:
                 flags=cv.SOLVEPNP_ITERATIVE,
             )
 
+            # Do camera projection magic
             (nose_end_point2D, jacobian) = cv.projectPoints(
                 np.array([(0.0, 0.0, 1000.0)]),
                 rotation_vector,
@@ -166,6 +167,7 @@ while True:
                 frame_info['dist_coeffs']
             )
 
+            # Fill our draw buffer
             for pos in landmark_positions:
                 point = create_point(pos, get_color(face_idx))
                 draw_buffer['points'].append(point)
@@ -176,6 +178,7 @@ while True:
 
             draw_buffer['lines'].append(line)
 
+        # Draw!
         draw(frame, draw_buffer)
 
 # When everything done, release the capture
