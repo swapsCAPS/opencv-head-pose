@@ -40,8 +40,8 @@ if not cap.isOpened():
     print('Cannot open camera')
     exit()
 
-#  cap.set(3, 1280)
-#  cap.set(4, 720)
+cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 
 def get_color(idx):
     colors = [
